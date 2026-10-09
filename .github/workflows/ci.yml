@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.8'
+      - name: Syntax checks
+        shell: bash
+        run: |
+          python -m py_compile bin/webext.py
+          bash -n bin/webext.sh
+          node --check tools/package.mjs
+      - name: Tests (Windows runs webext.ps1 and webext.py and compares them)
+        run: npm test
+      - name: Package smoke test
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ext/cs"
+          echo 'void 0;' > "$RUNNER_TEMP/ext/cs/a.js"
+          echo '{"manifest_version":3,"name":"Smoke","version":"1.0.0","content_scripts":[{"matches":["https://claude.ai/*"],"js":["cs/a.js"],"run_at":"document_start","world":"MAIN"}]}' > "$RUNNER_TEMP/ext/manifest.json"
+          echo '{"id":"smoke","displayName":"Smoke","source":"extension","order":100}' > "$RUNNER_TEMP/desktop-webext.json"
+          node tools/package.mjs --config "$RUNNER_TEMP/desktop-webext.json" --extension "$RUNNER_TEMP/ext" --out "$RUNNER_TEMP/pkg"
+          ls -la "$RUNNER_TEMP/pkg"
