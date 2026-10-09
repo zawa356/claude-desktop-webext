@@ -27,6 +27,9 @@
 - REAL [U]: Windows Claude 2.31226 ENV-VM: ctrl-enter (adopted) + split-ui via loader e39289f -> both work after restart.
 - consumers released: claude-split-ui v0.2.0 (desktop zip via tools/package.mjs), claude_ctrl-enter v0.4.0 (own wrappers + bundled loader).
 
+## RELEASES
+- v0.1.0 (2026-10-09): first release, tag on the docs commit (README Status/Known limitations, CHANGELOG). consumers should pin submodule to v0.1.0.
+
 ## NEXT
 1. push + CI green (py on ubuntu and windows, cross-compare on windows).
 2. claude-split-ui: add submodule vendor/claude-desktop-webext, desktop-webext.json (id claude-split-ui, order 10, source = WXT chrome build), CI packaging, real Desktop test.
@@ -34,5 +37,6 @@
 4. later: backup pruning; localized messages (ja); per-ext enable/disable.
 
 ## LOG (newest first)
+- 2026-10-09 | claude-opus-5-5 | docs refresh (README status table, pin instructions, known limitations), CHANGELOG.md; released v0.1.0 (user asked for latest releases in all repos). ctrl-enter 0.4.0 install.bat verified by user on ENV-VM [U].
 - 2026-10-09 | claude-opus-5-5 | fixes found by consumers: 8.3 short-path copy (d412421), absolute config source (e39289f), webext.sh real python3 check (b46a222; Windows Store alias). made PUBLIC (user). consumers released.
 - 2026-10-09 | claude-opus-5-5 | created repo locally: ps1+py loaders, package tool, tests (ps1 15/15 V), SPEC, README, CI.

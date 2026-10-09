@@ -29,6 +29,16 @@ This loader keeps every tool's extension as a normal folder of its own and **gen
 - **Never touches Claude itself.** No `app.asar`, MSIX package or binary changes; never closes or restarts Claude; nothing is deleted (old files move to `backups/`).
 - **Same folder format as [Claude-WebExtension-Launcher](https://github.com/lugia19/Claude-WebExtension-Launcher)** (one plain MV3 folder per extension), so an extension built for this loader can also be dropped into that launcher's `web-extensions` folder. That launcher is a separate patched Claude install; this project targets the official app.
 
+## Status
+
+| Platform | Status |
+|---|---|
+| Windows — Claude Desktop 2.31226 (Microsoft Store) | **Manually verified.** [claude-split-ui](https://github.com/zawa356/claude-split-ui) 0.2.x and [claude_ctrl-enter](https://github.com/zawa356/claude_ctrl-enter) 0.4.0 installed side by side: both work after a restart. Migration of a pre-existing standalone claude_ctrl-enter 0.3.0 install kept its saved settings. |
+| Linux — Claude Desktop beta | **Untested on a real machine.** `webext.py` is covered by CI only. |
+| macOS | Not supported |
+
+Tools built on this loader: [claude-split-ui](https://github.com/zawa356/claude-split-ui) (order 10) and [claude_ctrl-enter](https://github.com/zawa356/claude_ctrl-enter) (order 50).
+
 ## For users of a tool built on this
 
 Each tool's release ZIP contains `install` / `uninstall` / `diagnose` / `repair` scripts:
@@ -50,7 +60,10 @@ Requirements: Windows 10/11 with Windows PowerShell 5.1 (built in), or Linux wit
 
    ```sh
    git submodule add https://github.com/zawa356/claude-desktop-webext vendor/claude-desktop-webext
+   git -C vendor/claude-desktop-webext checkout v0.1.0   # pin a released version
    ```
+
+   Anyone cloning your repository then needs `git clone --recurse-submodules` (or `git submodule update --init`).
 
 2. Add `desktop-webext.json` to your repository:
 
@@ -109,6 +122,14 @@ Anything else (`background`, `action`, `options_page`, `host_permissions`, `web_
 - The extension ID depends on the slot path, which never changes. Settings in `chrome.storage` therefore survive updates and reinstalls.
 
 Details: [docs/SPEC.md](docs/SPEC.md).
+
+## Known limitations
+
+- Messages are in English only. Tools may add their own localized lines around the output; claude_ctrl-enter adds Japanese ones.
+- Backups under `backups/` are never pruned automatically. They are small, but you can delete old ones by hand.
+- If the user profile path is very long, a Windows path can exceed 260 characters; the operation then fails and is rolled back. Normal profile paths are far below that limit.
+- A tool that writes the slot folder directly, without this loader, makes the loader refuse to change the slot. `repair` with `-TakeOver` / `--take-over` moves that content to backups and regenerates the slot.
+- Claude updates may remove or change the `REACT_PROFILE` hook at any time. Each tool's `testedClaudeVersions` turns untested versions into a warning.
 
 ## Development
 
