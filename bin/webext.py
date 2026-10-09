@@ -20,7 +20,7 @@ import re
 import shutil
 import sys
 
-LOADER_VERSION = "0.2.0"
+LOADER_VERSION = "0.2.1"
 SCHEMA = 1
 SLOT_ID = "fmkadmapgofadopljbjfkapdkoienihi"
 SLOT_MARKER = ".claude-desktop-webext.json"
@@ -431,10 +431,20 @@ class Loader:
             for comm in glob.glob("/proc/[0-9]*/comm"):
                 try:
                     with open(comm) as f:
-                        if "claude" in f.read().lower():
-                            running += 1
+                        if "claude" not in f.read().lower():
+                            continue
                 except OSError:
-                    pass
+                    continue
+                # A Claude Code CLI binary is also named "claude" but has no app.asar next to it.
+                try:
+                    exe = os.readlink(os.path.join(os.path.dirname(comm), "exe"))
+                except OSError:
+                    exe = None
+                if exe and os.path.basename(exe) == "claude" and not any(
+                        os.path.isfile(os.path.join(os.path.dirname(exe), *rel))
+                        for rel in (("resources", "app.asar"), ("app.asar",))):
+                    continue
+                running += 1
             add("INFO", "Claude process", "running (%d). Quit Claude completely and start it again afterwards." % running
                 if running else "not running")
         return out

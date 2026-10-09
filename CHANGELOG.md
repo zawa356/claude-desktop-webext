@@ -4,9 +4,19 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-09
+
+Fixes for the installation discovery added in 0.2.0. Upgrade if 0.2.0 stopped with "Multiple installations found".
+
 ### Fixed
 
-- Windows: a running Claude Code CLI (`claude.exe`, e.g. from the VS Code extension) was counted as a second Claude Desktop installation, so install stopped with "Multiple installations found". A `claude.exe` now counts only when `resources\app.asar` sits next to it (as on Linux); the running-process count uses the same rule.
+- Windows: a running Claude Code CLI (`claude.exe`, e.g. from the VS Code extension) was counted as a second Claude Desktop installation, so install stopped with "Multiple installations found". A `claude.exe` now counts only when `resources\app.asar` sits next to it (as on Linux); the running-process count uses the same rule. Claude Desktop itself also starts such a `claude.exe` for its Code features, so this affected users without VS Code too.
+- Windows: a classic (Squirrel) installation that still has the previous `app-*` folder after an update was reported as two installations when Claude was not running. Only the newest `app-*` folder of an installation is a candidate now.
+- Linux: the `Claude process` count no longer includes a Claude Code CLI binary named `claude`.
+
+### Verified
+
+- Windows, Claude Desktop 2.31226 (MSIX, only virtualized user data) with the Claude Code CLI running: `diagnose` lists a single candidate and finds no problems. Install and restart on that machine are still to be verified.
 
 ## [0.2.0] - 2026-10-09
 

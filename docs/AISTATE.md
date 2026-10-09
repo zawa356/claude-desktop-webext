@@ -3,7 +3,7 @@
 
 ## META
 - head_at_update: a774314 (+ v0.2.0 release commit on top); main pushed to origin.
-- updated: 2026-10-09 (claude-opus-5-5, fix after v0.2.0: Claude Code CLI claude.exe counted as install)
+- updated: 2026-10-09 (claude-opus-5-5, v0.2.1 release)
 - repo: https://github.com/zawa356/claude-desktop-webext (PRIVATE at creation). MIT, holder zawa356. user replies in Japanese.
 - origin: split out of claude-split-ui session (Desktop support). consumers: zawa356/claude-split-ui (planned), zawa356/claude_ctrl-enter (planned 0.4 migration).
 
@@ -31,10 +31,12 @@
 
 ## RELEASES
 - v0.1.0 (2026-10-09): first release, tag on the docs commit (README Status/Known limitations, CHANGELOG).
+- v0.2.1 (2026-10-09): discovery fixes: claude.exe needs resourcesapp.asar (excludes Claude Code CLI from VS Code AND Desktop's own %APPDATA%Claudeclaude-code<ver>...claude.exe); newest app-* only per Squirrel root; py process count skips CLI. consumers: ctrl-enter v0.4.3, split-ui v0.2.3.
 - v0.2.0 (2026-10-09): installation discovery + -ClaudePath/--claude-path, virtual-only MSIX userData accepted, uninstall preflight. version in package.json/$LoaderVersion/LOADER_VERSION/SPEC example. release = annotated tag + `gh release create --latest` with CHANGELOG section (no CI release job). consumers pin submodule to v0.2.0.
 
 ## NEXT
-- BUG in v0.2.0 [U]: user ran ctrl-enter 0.4.2 install.bat -> NG Multiple installations: MSIX Claude + running VS Code Claude Code CLI ...
+- v0.2.1 RELEASED (fixes below). remaining: real install + restart on the virtual-only MSIX PC (does MSIX Claude read a real %APPDATA%Claudeextensions created after the fact? only verified where the real Claude dir pre-existed) [H]; classic runtime; Linux real machine.
+- (fixed in 0.2.1) BUG in v0.2.0 [U]: user ran ctrl-enter 0.4.2 install.bat -> NG Multiple installations: MSIX Claude + running VS Code Claude Code CLI ...
 ative-binaryclaude.exe (2.1.295). fixed on main (Test-ClaudeDesktopExe: resourcesapp.asar next to exe; also process count). release as v0.2.1 + consumers pending user OK. workaround on 0.2.0: install.bat -ClaudePath "<MSIX appclaude.exe>".
 0. Implemented: virtual-only MSIX user data accepted; installation discovery and explicit path selection. Remaining: real install/restart verification on this PC and classic Windows runtime verification. Published as v0.2.0.
 1. push + CI green (py on ubuntu and windows, cross-compare on windows).
@@ -43,6 +45,7 @@ ative-binaryclaude.exe (2.1.295). fixed on main (Test-ClaudeDesktopExe: resource
 4. later: backup pruning; localized messages (ja); per-ext enable/disable.
 
 ## LOG (newest first)
+- 2026-10-09 | claude-opus-5-5 | re-review of loader (user request) after v0.2.0 bug. findings: (1) CLI claude.exe misdetection (fixed e57ab9d; broader: Desktop spawns claude-code<ver>claude.exe itself) V; (2) virtual-only MSIX: slot created in real %APPDATA%Claude afterwards, MSIX read visibility unverified H; (3) Squirrel keeps previous app-* -> 2 candidates when not running H -> fixed (newest only), test fails on old ps1 V; (4) py process count counted CLI -> fixed. no issues: wrapper arg/exit forwarding, transactions/rollback, slot ownership, REACT_PROFILE, MSIX dedupe, manifest parity. npm test 42/42 V; real diagnose OK V. released v0.2.1.
 - 2026-10-09 | claude-opus-5-5 | U: v0.2.0 install refused on user PC because Get-Process claude also returned the Claude Code CLI (VS Code extension native binary, no app.asar) as running candidate -> 2 running candidates -> NG. fix: ps1 candidates require resourcesapp.asar next to claude.exe (py already required app.asar); running count same filter; -ClaudePath message. new regression test fails on old ps1, passes now; npm test 41/41 V. real read-only diagnose on user PC: single MSIX candidate, no problems, exit 0 V. not yet released.
 - 2026-10-09 | claude-opus-5-5 | took over from Codex (usage limit). bumped 0.1.0->0.2.0 (package.json, ps1, py, SPEC example), CHANGELOG [0.2.0], README Status (MSIX virtual-only diagnose; classic installer row = untested), pin example v0.2.0. npm test 40/40 V. pushed main, tagged v0.2.0, gh release Latest. open: real install/restart on virtual-only MSIX PC, classic runtime, Linux real machine.
 - 2026-10-09 | Codex | V: implemented Windows package/process/registry/standard-path discovery, running-candidate preference, ambiguity refusal and -ClaudePath; MSIX virtual-only user data accepted while keeping normal slot path; virtual-slot protection and preflight extended to uninstall. Python --claude-path and multiple-install refusal; unreadable archive now refuses. Windows Node test suite: 40/40 PASS (PS5.1 + Python, including byte-identical manifest). Linux Python sandbox custom-path install/diagnose/rebuild/uninstall PASS; tools/package.mjs sandbox verification with ctrl-enter source PASS. Real read-only diagnose on current MSIX 2.31226 now exits 0 (previously 1); no real install/restart. Docs/tests updated. Classic runtime still unverified.

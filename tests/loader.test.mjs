@@ -433,6 +433,24 @@ if (hasPowerShell) {
       refused(impl.run(t.sb, { action: 'diagnose', claudePath: join(cli, 'claude.exe') }));
     } finally { t.cleanup(); }
   });
+  test('ps1: a classic install with old app-* folders left by updates is one installation (newest)', () => {
+    const t = setup(impl);
+    try {
+      const root = join(t.sb, 'AnthropicClaude');
+      mkdirSync(root, { recursive: true });
+      writeFileSync(join(root, 'claude.exe'), 'fixture stub without app.asar');
+      for (const v of ['1.9.0', '1.10.0']) {
+        mkdirSync(join(root, `app-${v}`, 'resources'), { recursive: true });
+        writeFileSync(join(root, `app-${v}`, 'claude.exe'), 'fixture');
+        writeFileSync(join(root, `app-${v}`, 'resources', 'app.asar'), 'fixture');
+      }
+      writeFileSync(join(t.sb, 'claude-installations.json'), JSON.stringify([{ Path: root, Kind: 'classic registry' }]));
+      const r = impl.run(t.sb, { action: 'diagnose' }); ok(r);
+      assert.match(r.stdout, /Claude selected: .*app-1\.10\.0/);
+      assert.doesNotMatch(r.stdout, /app-1\.9\.0/);
+      ok(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src) }));
+    } finally { t.cleanup(); }
+  });
 }
 
 if (python) {

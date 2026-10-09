@@ -20,7 +20,8 @@ Windows uses MSIX registrations, running executable paths, classic uninstall reg
 InstallLocation/DisplayIcon and standard locations. Registry commands are never executed.
 A `claude.exe` is a candidate only if `resources\app.asar` exists next to it; this excludes
 other programs with the same name, such as the Claude Code CLI. The running-process count
-uses the same test. Candidates are deduplicated by executable path (case insensitive). Select the sole
+uses the same test. Of the `app-*` folders of one installation directory, only the newest
+usable one (highest version in the folder name) is a candidate. Candidates are deduplicated by executable path (case insensitive). Select the sole
 running candidate, otherwise the sole candidate; multiple candidates block changes.
 `-ClaudePath` selects an executable or installation directory explicitly. An invalid
 explicit path blocks changes. No detected candidate gives a warning for backward
@@ -49,7 +50,7 @@ Custom user-data paths are not inferred. Linux retains its XDG user-data rules.
 Slot marker `<slot>/.claude-desktop-webext.json`:
 
 ```json
-{ "schema": 1, "tool": "claude-desktop-webext", "loaderVersion": "0.2.0", "generation": 3, "generatedAt": "...",
+{ "schema": 1, "tool": "claude-desktop-webext", "loaderVersion": "0.2.1", "generation": 3, "generatedAt": "...",
   "extensions": [ { "id": "...", "version": "...", "order": 10 } ], "skipped": [ { "id": "...", "reason": "..." } ] }
 ```
 

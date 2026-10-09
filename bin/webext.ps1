@@ -37,7 +37,7 @@ if ($PSVersionTable.PSVersion.Major -le 5) {
 }
 
 # ---- Fixed values (changing them breaks existing installs; see docs/SPEC.md) ----
-$LoaderVersion  = '0.2.0'
+$LoaderVersion  = '0.2.1'
 $Schema         = 1
 $SlotId         = 'fmkadmapgofadopljbjfkapdkoienihi'
 $SlotMarker     = '.claude-desktop-webext.json'
@@ -169,11 +169,17 @@ function Find-ClaudeExecutables([string]$Path) {
         $exe = Join-Path $Path $rel
         if (Test-Path -LiteralPath $exe -PathType Leaf) { (Get-Item -LiteralPath $exe).FullName }
     }
-    # Squirrel-style installations keep versioned app-* directories.
+    # Squirrel-style installations keep versioned app-* directories, and an update leaves the
+    # previous one behind. They are one installation: take the newest usable version only.
+    $best = $null; $bestVersion = $null
     foreach ($d in Get-ChildItem -LiteralPath $Path -Directory -Filter 'app-*' -ErrorAction SilentlyContinue) {
         $exe = Join-Path $d.FullName 'claude.exe'
-        if (Test-Path -LiteralPath $exe -PathType Leaf) { (Get-Item -LiteralPath $exe).FullName }
+        if (!(Test-Path -LiteralPath $exe -PathType Leaf) -or !(Test-ClaudeDesktopExe $exe)) { continue }
+        $v = $null
+        if (![version]::TryParse(($d.Name.Substring(4) -replace '-.*$', ''), [ref]$v)) { $v = New-Object version 0, 0 }
+        if (!$best -or $v -gt $bestVersion) { $best = $exe; $bestVersion = $v }
     }
+    if ($best) { (Get-Item -LiteralPath $best).FullName }
 }
 function Get-ClaudeInstallations($Packages) {
     $found = New-Object System.Collections.ArrayList
