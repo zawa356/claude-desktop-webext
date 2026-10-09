@@ -125,15 +125,14 @@ function Get-Sha256([string]$Path) {
     try { ([BitConverter]::ToString($sha.ComputeHash($stream)) -replace '-', '').ToLowerInvariant() } finally { $stream.Dispose(); $sha.Dispose() }
 }
 function Copy-Verified([string]$From, [string]$To) {
-    # Copy a directory tree and verify every file by SHA-256.
+    # Copy a directory tree and verify every file by SHA-256. Recurses by name instead of slicing
+    # FullName, because 8.3 short paths (C:\Users\RUNNER~1) and long paths differ in length.
     New-Item -ItemType Directory -Force -Path $To | Out-Null
-    $root = (Resolve-Path -LiteralPath $From).ProviderPath.TrimEnd('\')
-    foreach ($f in Get-ChildItem -LiteralPath $root -Recurse -Force -File) {
-        $rel = $f.FullName.Substring($root.Length + 1)
-        $dest = Join-Path $To $rel
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-        Copy-Item -LiteralPath $f.FullName -Destination $dest
-        if ((Get-Sha256 $dest) -ne (Get-Sha256 $f.FullName)) { throw "copy verification failed: $rel" }
+    foreach ($item in Get-ChildItem -LiteralPath $From -Force) {
+        $dest = Join-Path $To $item.Name
+        if ($item.PSIsContainer) { Copy-Verified $item.FullName $dest; continue }
+        Copy-Item -LiteralPath $item.FullName -Destination $dest
+        if ((Get-Sha256 $dest) -ne (Get-Sha256 $item.FullName)) { throw "copy verification failed: $($item.FullName)" }
     }
 }
 function New-Stamp { (Get-Date).ToString('yyyyMMdd-HHmmss-fff') }
@@ -519,7 +518,8 @@ function Invoke-Install {
             displayName = $req.displayName; version = $check.version; order = $order
             installedAt = (Get-Key $old 'installedAt' (Now)); updatedAt = (Now)
         }
-        [void](Update-Slot $state $backup)
+        $plan = Update-Slot $state $backup
+        if (@($plan.entries | Where-Object { $_.id -eq $req.id }).Count -ne 1) { throw "$($req.id) was not accepted into the slot" }
         Update-Env $state $true
         Save-State $state
     }

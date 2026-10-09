@@ -603,7 +603,9 @@ class Loader:
                 "displayName": req["displayName"], "version": check["version"], "order": order,
                 "installedAt": old.get("installedAt", now()), "updatedAt": now(),
             }
-            self.update_slot(state, backup)
+            pl = self.update_slot(state, backup)
+            if req["id"] not in [e["id"] for e in pl["entries"]]:
+                raise RuntimeError(req["id"] + " was not accepted into the slot")
             self.update_env(state, True, backup)
             self.save_state(state)
         self.transaction(mode, body)
