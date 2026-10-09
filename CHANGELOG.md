@@ -4,6 +4,19 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Fixed
+
+- Accept an existing MSIX virtual user-data directory when the normal roaming directory
+  does not yet exist, preserving the stable extension destination and saved settings.
+- Apply preflight checks to uninstall as well as install/repair, including virtual slot conflicts.
+
+### Added
+
+- Windows installation discovery from packages, running processes, classic installer
+  registry entries and standard locations; show candidates and reject ambiguous selection.
+- Explicit `-ClaudePath` / `--claude-path` selection for nonstandard installations.
+  Linux now rejects multiple detected installations instead of silently choosing the first.
+
 ## [0.1.0] - 2026-10-09
 
 First release.

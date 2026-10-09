@@ -36,6 +36,7 @@ if (hasPowerShell) {
       const a = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'bin', 'webext.ps1'), '-Action', o.action, '-Yes', '-Sandbox', sb];
       if (o.id) a.push('-Id', o.id);
       if (o.source) a.push('-Source', o.source);
+      if (o.claudePath) a.push('-ClaudePath', o.claudePath);
       if (o.order !== undefined) a.push('-Order', String(o.order));
       if (o.config) a.push('-Config', o.config);
       if (o.adoptEnv) a.push('-AdoptEnv');
@@ -60,6 +61,7 @@ if (python) {
       const a = [join(root, 'bin', 'webext.py'), o.action, '--yes', '--sandbox', sb];
       if (o.id) a.push('--id', o.id);
       if (o.source) a.push('--source', o.source);
+      if (o.claudePath) a.push('--claude-path', o.claudePath);
       if (o.order !== undefined) a.push('--order', String(o.order));
       if (o.config) a.push('--config', o.config);
       if (o.adoptEnv) a.push('--adopt-env');
@@ -316,3 +318,114 @@ test('ps1 and py generate byte-identical manifests', { skip: impls.length < 2 &&
   assert.equal(outputs[0].manifest, outputs[1].manifest);
   assert.deepEqual(outputs[0].marker, outputs[1].marker);
 });
+
+for (const impl of impls) {
+  test(`${impl.name}: an invalid explicit Claude path refuses changes`, () => {
+    const t = setup(impl);
+    try {
+      const before = snapshot(t.sb);
+      refused(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src), claudePath: join(t.sb, 'missing') }));
+      assert.deepEqual(snapshot(t.sb), before);
+    } finally { t.cleanup(); }
+  });
+  test(`${impl.name}: an explicit nonstandard Claude installation is accepted`, () => {
+    const t = setup(impl);
+    try {
+      const dir = join(t.sb, 'custom location');
+      mkdirSync(join(dir, 'resources'), { recursive: true });
+      writeFileSync(join(dir, 'claude.exe'), 'fixture, never executed');
+      writeFileSync(join(dir, 'resources', 'app.asar'), 'REACT_PROFILE');
+      ok(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src), claudePath: dir }));
+      assert.ok(existsSync(impl.slot(t.sb)));
+    } finally { t.cleanup(); }
+  });
+}
+
+if (hasPowerShell) {
+  const impl = impls.find(i => i.name === 'ps1');
+  function packageData(t) {
+    const pfn = 'Claude_test';
+    writeFileSync(join(t.sb, 'claude-package.json'), JSON.stringify({ Version: '2.31226.0.0', PackageFamilyName: pfn }));
+    const dir = join(t.sb, 'AppData', 'Local', 'Packages', pfn, 'LocalCache', 'Roaming', 'Claude');
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+  test('ps1: virtual-only user data allows install without moving the stable slot; diagnose is read-only', () => {
+    const t = setup(impl);
+    try {
+      rmSync(join(t.sb, 'AppData', 'Roaming', 'Claude'), { recursive: true });
+      const virtual = packageData(t);
+      const before = snapshot(t.sb);
+      ok(impl.run(t.sb, { action: 'diagnose' }));
+      assert.deepEqual(snapshot(t.sb), before);
+      assert.equal(existsSync(join(t.sb, 'AppData', 'Roaming', 'Claude')), false);
+      ok(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src) }));
+      assert.ok(existsSync(impl.slot(t.sb)));
+      assert.equal(existsSync(join(virtual, 'extensions')), false);
+      ok(impl.run(t.sb, { action: 'uninstall', id: 'ext-a' }));
+      assert.equal(impl.envValue(t.sb), null);
+    } finally { t.cleanup(); }
+  });
+  test('ps1: missing both user data locations still refuses install', () => {
+    const t = setup(impl);
+    try {
+      rmSync(join(t.sb, 'AppData', 'Roaming', 'Claude'), { recursive: true });
+      refused(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src) }));
+      assert.equal(existsSync(impl.slot(t.sb)), false);
+    } finally { t.cleanup(); }
+  });
+  test('ps1: virtual shadow blocks install, repair and uninstall without mutations', () => {
+    const t = setup(impl);
+    try {
+      const source = extA(t.src);
+      ok(impl.run(t.sb, { action: 'install', id: 'ext-a', source }));
+      mkdirSync(join(packageData(t), 'extensions', SLOT_ID), { recursive: true });
+      const before = snapshot(t.sb);
+      for (const action of ['install', 'rebuild', 'uninstall']) {
+        refused(impl.run(t.sb, { action, id: 'ext-a', source }));
+        assert.deepEqual(snapshot(t.sb), before);
+      }
+    } finally { t.cleanup(); }
+  });
+  test('ps1: classic discovery, ambiguous installs, running preference and explicit selection', () => {
+    const t = setup(impl);
+    try {
+      const source = extA(t.src);
+      const paths = ['classic a', 'classic b'].map(name => {
+        const dir = join(t.sb, name); mkdirSync(dir);
+        const exe = join(dir, 'claude.exe'); writeFileSync(exe, 'fixture'); return exe;
+      });
+      const fixture = join(t.sb, 'claude-installations.json');
+      const entries = paths.map(Path => ({ Path, Kind: 'classic registry', Version: '2.0' }));
+      writeFileSync(fixture, JSON.stringify([entries[0]]));
+      const single = impl.run(t.sb, { action: 'diagnose' }); ok(single);
+      assert.match(single.stdout, /classic registry/);
+      writeFileSync(fixture, JSON.stringify(entries));
+      const before = snapshot(t.sb);
+      refused(impl.run(t.sb, { action: 'install', id: 'ext-a', source }));
+      assert.deepEqual(snapshot(t.sb), before);
+      ok(impl.run(t.sb, { action: 'diagnose', claudePath: paths[1] }));
+      entries[0].Running = true;
+      writeFileSync(fixture, JSON.stringify(entries));
+      ok(impl.run(t.sb, { action: 'install', id: 'ext-a', source }));
+      entries[1].Running = true;
+      writeFileSync(fixture, JSON.stringify(entries));
+      refused(impl.run(t.sb, { action: 'diagnose' }));
+    } finally { t.cleanup(); }
+  });
+}
+
+if (python) {
+  const impl = impls.find(i => i.name === 'py');
+  test('py: multiple detected installations require explicit selection', () => {
+    const t = setup(impl);
+    try {
+      const dirs = ['claude-a', 'claude-b'].map(name => join(t.sb, 'opt', name, 'resources'));
+      for (const dir of dirs) { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'app.asar'), 'REACT_PROFILE'); }
+      const before = snapshot(t.sb);
+      refused(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src) }));
+      assert.deepEqual(snapshot(t.sb), before);
+      ok(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src), claudePath: join(dirs[0], 'app.asar') }));
+    } finally { t.cleanup(); }
+  });
+}

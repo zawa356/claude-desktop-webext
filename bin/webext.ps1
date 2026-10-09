@@ -21,6 +21,7 @@ param(
     [string]$Config,
     [string]$Id,
     [string]$Source,
+    [string]$ClaudePath,
     [int]$Order = -1,
     [switch]$AdoptEnv,
     [switch]$TakeOver,
@@ -137,17 +138,81 @@ function Copy-Verified([string]$From, [string]$To) {
 }
 function New-Stamp { (Get-Date).ToString('yyyyMMdd-HHmmss-fff') }
 
-function Get-ClaudePackage {
+# Discovery is read-only. Never execute registry command strings or Claude itself.
+function Get-ClaudePackages {
     if ($Sandbox) {
         $fake = Read-Json (Join-Path $Sandbox 'claude-package.json')
-        if ($fake) { return [pscustomobject]@{ Version = (Get-Key $fake 'Version'); PackageFamilyName = (Get-Key $fake 'PackageFamilyName') } }
-        return $null
+        if ($fake) { [pscustomobject]@{ Version = (Get-Key $fake 'Version'); PackageFamilyName = (Get-Key $fake 'PackageFamilyName'); InstallLocation = (Get-Key $fake 'InstallLocation') } }
+        return
     }
-    try { Get-AppxPackage -Name 'Claude' -ErrorAction Stop | Select-Object -First 1 } catch { $null }
+    try { Get-AppxPackage -Name 'Claude' -ErrorAction Stop } catch { }
 }
-function Get-VirtualSlot($Package) {
+function Get-VirtualUserData($Package) {
     if (!$Package -or !$Package.PackageFamilyName) { return $null }
-    Join-Path $Local "Packages\$($Package.PackageFamilyName)\LocalCache\Roaming\Claude\extensions\$SlotId"
+    Join-Path $Local "Packages\$($Package.PackageFamilyName)\LocalCache\Roaming\Claude"
+}
+function Find-ClaudeExecutables([string]$Path) {
+    if (!$Path) { return }
+    $Path = [Environment]::ExpandEnvironmentVariables($Path.Trim('"'))
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        if ([IO.Path]::GetFileName($Path) -ieq 'claude.exe') { (Get-Item -LiteralPath $Path).FullName }
+        return
+    }
+    if (!(Test-Path -LiteralPath $Path -PathType Container)) { return }
+    foreach ($rel in @('claude.exe', 'app\claude.exe', 'current\claude.exe')) {
+        $exe = Join-Path $Path $rel
+        if (Test-Path -LiteralPath $exe -PathType Leaf) { (Get-Item -LiteralPath $exe).FullName }
+    }
+    # Squirrel-style installations keep versioned app-* directories.
+    foreach ($d in Get-ChildItem -LiteralPath $Path -Directory -Filter 'app-*' -ErrorAction SilentlyContinue) {
+        $exe = Join-Path $d.FullName 'claude.exe'
+        if (Test-Path -LiteralPath $exe -PathType Leaf) { (Get-Item -LiteralPath $exe).FullName }
+    }
+}
+function Get-ClaudeInstallations($Packages) {
+    $found = New-Object System.Collections.ArrayList
+    $add = { param($Path, $Kind, $Version, $Running)
+        foreach ($exe in Find-ClaudeExecutables $Path) {
+            $existing = @($found | Where-Object { $_.Path -ieq $exe })
+            if ($existing.Count) { if ($Running) { $existing[0].Running = $true }; continue }
+            $v = $Version
+            if (!$v) { $v = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion }
+            [void]$found.Add([pscustomobject]@{ Path = $exe; Kind = $Kind; Version = $v; Running = [bool]$Running })
+        }
+    }
+    if ($ClaudePath) {
+        & $add $ClaudePath 'explicit' $null $false
+        return $found.ToArray()
+    }
+    foreach ($pkg in $Packages) { & $add $pkg.InstallLocation 'MSIX' $pkg.Version $false }
+    if ($Sandbox) {
+        $fixtures = Read-Json (Join-Path $Sandbox 'claude-installations.json')
+        foreach ($f in $fixtures) {
+            if ($f) { & $add (Get-Key $f 'Path') (Get-Key $f 'Kind' 'classic') (Get-Key $f 'Version') (Get-Key $f 'Running' $false) }
+        }
+    } else {
+        foreach ($proc in Get-Process -Name 'claude' -ErrorAction SilentlyContinue) {
+            try { & $add $proc.Path 'running executable' $null $true } catch { }
+        }
+        $roots = @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+        foreach ($entry in Get-ItemProperty $roots -ErrorAction SilentlyContinue) {
+            if (!$entry.PSObject.Properties['DisplayName'] -or $entry.DisplayName -notmatch '^Claude(?:\s|$)') { continue }
+            if ($entry.PSObject.Properties['InstallLocation']) { & $add $entry.InstallLocation 'classic registry' $null $false }
+            if ($entry.PSObject.Properties['DisplayIcon']) {
+                $icon = [string]$entry.DisplayIcon
+                if ($icon -match '^"([^"]+\.exe)"(?:,\s*-?\d+)?$') { $icon = $Matches[1] }
+                else { $icon = $icon -replace ',\s*-?\d+$', '' }
+                & $add $icon 'classic registry' $null $false
+            }
+        }
+        foreach ($base in @((Join-Path $Local 'AnthropicClaude'), (Join-Path $Local 'Programs\Claude'),
+            (Join-Path $env:ProgramFiles 'Claude'), (Join-Path $env:ProgramFiles 'Anthropic\Claude'))) {
+            & $add $base 'standard location' $null $false
+        }
+    }
+    $found.ToArray()
 }
 
 # REACT_PROFILE: raw registry value (not expanded). The sandbox uses env-<Scope>.json files.
@@ -315,16 +380,42 @@ function Get-Findings($Request, [string]$Mode) {
     $add = { param($Level, $Item, $Detail) [void]$list.Add([pscustomobject]@{ Level = $Level; Item = $Item; Detail = $Detail }) }
     & $add 'INFO' 'Loader' "claude-desktop-webext $LoaderVersion, PowerShell $($PSVersionTable.PSVersion)"
 
-    $pkg = Get-ClaudePackage
-    if (!$pkg) { & $add 'WARN' 'Claude' 'Microsoft Store (MSIX) Claude was not found.' }
-    elseif ($Request -and @($Request.tested).Count -gt 0 -and ($Request.tested -notcontains $pkg.Version)) { & $add 'WARN' 'Claude' "$($pkg.Version) (not tested with $($Request.displayName))" }
-    else { & $add 'OK' 'Claude' "$($pkg.Version)" }
+    $packages = @(Get-ClaudePackages)
+    $installs = @(Get-ClaudeInstallations $packages)
+    foreach ($candidate in $installs) {
+        & $add 'INFO' 'Claude candidate' "$($candidate.Kind): $($candidate.Path) (version $($candidate.Version), running=$($candidate.Running))"
+    }
+    $runningInstalls = @($installs | Where-Object { $_.Running })
+    $selected = $null
+    if ($runningInstalls.Count -eq 1) { $selected = $runningInstalls[0] }
+    elseif ($installs.Count -eq 1) { $selected = $installs[0] }
+    elseif ($installs.Count -gt 1) { & $add 'NG' 'Claude' 'Multiple installations found. Specify -ClaudePath with the intended claude.exe path.' }
+    elseif ($ClaudePath) { & $add 'NG' 'Claude' '-ClaudePath does not identify a claude.exe file. Nothing will be changed.' }
+    else { & $add 'WARN' 'Claude' 'No executable found in package, process, registry or standard locations. Use -ClaudePath to specify it; runtime compatibility is unverified.' }
+    if ($selected) {
+        if ($Request -and @($Request.tested).Count -gt 0 -and ($Request.tested -notcontains $selected.Version)) {
+            & $add 'WARN' 'Claude version' "$($selected.Version) (not tested with $($Request.displayName))"
+        }
+        & $add 'INFO' 'Claude selected' $selected.Path
+        & $add 'WARN' 'Runtime compatibility' 'Finding Claude does not verify its REACT_PROFILE hook. Restart and runtime verification are still required.'
+    }
 
-    if (Test-Path -LiteralPath $UserData) { & $add 'OK' 'Claude user data' $UserData }
-    else { & $add 'NG' 'Claude user data' "$UserData does not exist. Start Claude once first." }
-
-    $virtual = Get-VirtualSlot $pkg
-    if ($virtual -and (Test-Path -LiteralPath $virtual)) { & $add 'NG' 'Slot (package-virtualized)' "$virtual exists and may shadow the real slot." }
+    $virtualDataFound = $false
+    foreach ($pkg in $packages) {
+        $virtualData = Get-VirtualUserData $pkg
+        if (!$virtualData) { continue }
+        if (Test-Path -LiteralPath $virtualData -PathType Container) {
+            $virtualDataFound = $true
+            & $add 'INFO' 'Claude package user data' $virtualData
+        }
+        $virtual = Join-Path $virtualData "extensions\$SlotId"
+        if (Test-Path -LiteralPath $virtual) { & $add 'NG' 'Slot (package-virtualized)' "$virtual exists and may shadow the real slot." }
+    }
+    if (Test-Path -LiteralPath $UserData -PathType Container) { & $add 'OK' 'Claude user data' $UserData }
+    elseif ($virtualDataFound) {
+        & $add 'OK' 'Claude user data' "Package user data exists. Install will create the stable real slot under $UserData; diagnose does not create it."
+    } else { & $add 'NG' 'Claude user data' "$UserData does not exist and no package user data was found. Start the intended Claude once first." }
+    & $add 'INFO' 'Extension destination' $Slot
 
     $rawState = Read-Json $StateFile
     if ([int](Get-Key $rawState 'schema' 0) -gt $Schema) { & $add 'NG' 'Loader' "state.json was written by a newer claude-desktop-webext (schema $(Get-Key $rawState 'schema')). Update this tool."; return , $list.ToArray() }
@@ -532,6 +623,8 @@ function Invoke-Uninstall {
     $target = Join-Path $Store $req.id
     $state = Read-State
     if (!(Test-Path -LiteralPath $target) -and !(Get-Key $state.extensions $req.id)) { Write-Host "$($req.displayName) is not installed. Nothing was changed."; return }
+    $ng = Show-Findings (Get-Findings $req 'uninstall')
+    if ($ng) { Write-Host 'Uninstall stopped because of the problems above. Nothing was changed.'; exit 1 }
     $owner = Get-SlotOwner $Slot $null
     if ($owner -ne 'ours' -and $owner -ne 'none') { Write-Host "The slot is used by another tool; it will not be changed. Nothing was changed." -ForegroundColor Yellow; exit 1 }
     Confirm-Action "Uninstall $($req.displayName)."

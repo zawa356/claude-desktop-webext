@@ -54,6 +54,30 @@ Afterwards, quit Claude completely (tray icon → Quit) and start it again. On L
 
 Requirements: Windows 10/11 with Windows PowerShell 5.1 (built in), or Linux with `python3` ≥ 3.8 (preinstalled on Ubuntu/Debian desktops). No admin/root rights.
 
+## Installation discovery
+
+Windows discovers Claude through MSIX registration, running `claude.exe` processes,
+classic installer registry entries, and standard installation directories (including
+versioned `app-*` directories). A single running candidate takes precedence. If several
+candidates remain, specify the intended executable with `-ClaudePath`:
+
+```powershell
+.\diagnose.bat -ClaudePath "D:\Apps\Claude\claude.exe"
+.\install.bat -ClaudePath "D:\Apps\Claude\claude.exe"
+```
+
+Repeat the selection for repair/uninstall if discovery remains ambiguous. It selects
+an installation for diagnostics; it does not change Claude's user-data directory.
+On Linux, `--claude-path` accepts the executable, installation directory or `app.asar`.
+Finding an installation does not prove that its build supports the extension hook;
+classic Windows installations and Linux still require real runtime verification.
+
+The extension destination stays at the existing user-data path, preserving extension
+IDs and saved settings. When only MSIX virtualized user data exists, installation can
+create the normal `%APPDATA%\Claude\extensions` destination. Diagnosis is read-only.
+An existing virtualized extension slot still blocks changes to avoid shadowing it.
+Custom `--user-data-dir` profiles are not automatically inferred or relocated.
+
 ## For tool developers
 
 1. Add the loader as a submodule:

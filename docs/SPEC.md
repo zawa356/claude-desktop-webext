@@ -14,6 +14,27 @@ Both implementations — `bin/webext.ps1` (Windows) and `bin/webext.py` (Linux; 
 | Lock | `<home>\.lock` | same |
 | REACT_PROFILE | user registry value `HKCU\Environment` | `~/.config/environment.d/90-claude-desktop-webext.conf` |
 
+## Installation discovery
+
+Windows uses MSIX registrations, running executable paths, classic uninstall registry
+InstallLocation/DisplayIcon and standard locations. Registry commands are never executed.
+Candidates are deduplicated by executable path (case insensitive). Select the sole
+running candidate, otherwise the sole candidate; multiple candidates block changes.
+`-ClaudePath` selects an executable or installation directory explicitly. An invalid
+explicit path blocks changes. No detected candidate gives a warning for backward
+compatibility; this does not verify runtime support. Sandbox discovery uses
+`claude-package.json` and `claude-installations.json` and never scans the host.
+Linux discovers app.asar in standard directories; multiple candidates block changes.
+`--claude-path` accepts an installation directory, executable or app.asar.
+
+App installation location and user-data destination are independent. Keep the existing
+slot path. On Windows, either the normal user-data directory or an existing registered
+package's virtual user-data directory satisfies the started-once check. With only the
+latter, install creates the normal slot path; diagnose creates nothing. Virtual slots
+from any discovered package block changes, including uninstall. Explicit installation
+selection never bypasses slot ownership, virtual-shadow, environment or schema checks.
+Custom user-data paths are not inferred. Linux retains its XDG user-data rules.
+
 ## Files
 
 `state.json` (written only by the loader):

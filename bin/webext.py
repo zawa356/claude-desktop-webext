@@ -338,13 +338,20 @@ class Loader:
             return "react-devtools"
         return "unknown"
 
-    def find_app_asar(self):
+    def find_app_asars(self):
+        if self.args.claude_path:
+            path = os.path.abspath(self.args.claude_path)
+            if os.path.isfile(path) and os.path.basename(path) == "app.asar":
+                return [path]
+            base = path if os.path.isdir(path) else os.path.dirname(path)
+            if not os.path.exists(path):
+                return []
+            return [p for p in (os.path.join(base, "resources", "app.asar"),
+                               os.path.join(base, "app.asar")) if os.path.isfile(p)]
         pats = ["usr/lib/*laude*/resources/app.asar", "opt/*laude*/resources/app.asar",
                 "usr/share/*laude*/resources/app.asar", "usr/lib/*laude*/app.asar", "opt/*laude*/app.asar"]
-        for pat in pats:
-            for hit in sorted(glob.glob(os.path.join(self.p.root, pat))):
-                return hit
-        return None
+        return sorted(set(os.path.realpath(hit) for pat in pats
+                          for hit in glob.glob(os.path.join(self.p.root, pat)) if os.path.isfile(hit)))
 
     def findings(self, req, mode):
         out = []
@@ -352,16 +359,25 @@ class Loader:
         def add(level, item, detail):
             out.append((level, item, detail))
         add("INFO", "Loader", "claude-desktop-webext %s, Python %s" % (LOADER_VERSION, sys.version.split()[0]))
-        asar = self.find_app_asar()
-        if not asar:
+        candidates = self.find_app_asars()
+        for candidate in candidates:
+            add("INFO", "Claude candidate", candidate)
+        asar = candidates[0] if len(candidates) == 1 else None
+        if len(candidates) > 1:
+            add("NG", "Claude", "Multiple installations found. Specify --claude-path with the intended executable, directory or app.asar.")
+        elif self.args.claude_path and not asar:
+            add("NG", "Claude", "--claude-path does not identify an installation containing app.asar.")
+        elif not asar:
             add("WARN", "Claude", "Claude Desktop installation (app.asar) was not found in the usual places.")
         else:
             try:
                 with open(asar, "rb") as f:
                     has_loader = b"REACT_PROFILE" in f.read()
             except OSError:
-                has_loader = True
-            if has_loader:
+                has_loader = None
+            if has_loader is None:
+                add("NG", "Claude", "Cannot read app.asar to check the loader: " + asar)
+            elif has_loader:
                 add("OK", "Claude", asar)
             else:
                 add("NG", "Claude", asar + " does not contain the REACT_PROFILE loader; this build cannot load extensions.")
@@ -619,6 +635,8 @@ class Loader:
         if not os.path.exists(target) and req["id"] not in state["extensions"]:
             print("%s is not installed. Nothing was changed." % req["displayName"])
             return
+        if self.show(self.findings(req, "uninstall")):
+            raise Abort(1, "Uninstall stopped because of the problems above. Nothing was changed.")
         if self.slot_owner(self.p.slot, None) not in ("ours", "none"):
             raise Abort(1, "The slot is used by another tool; it will not be changed. Nothing was changed.")
         self.confirm("Uninstall %s." % req["displayName"])
@@ -657,6 +675,7 @@ def main(argv=None):
     ap.add_argument("--config")
     ap.add_argument("--id")
     ap.add_argument("--source")
+    ap.add_argument("--claude-path")
     ap.add_argument("--order", type=int, default=-1)
     ap.add_argument("--adopt-env", action="store_true")
     ap.add_argument("--take-over", action="store_true")
