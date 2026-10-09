@@ -187,7 +187,8 @@ function Resolve-Request {
         if (!$c) { throw "cannot read config: $Config" }
         $base = Split-Path -Parent (Resolve-Path -LiteralPath $Config).ProviderPath
         if (!$r.id) { $r.id = Get-Key $c 'id' }
-        if (!$r.source -and (Get-Key $c 'source')) { $r.source = Join-Path $base (Get-Key $c 'source') }
+        $src = Get-Key $c 'source'
+        if (!$r.source -and $src) { $r.source = if ([IO.Path]::IsPathRooted($src)) { $src } else { Join-Path $base $src } }
         if ($r.order -lt 0 -and $null -ne (Get-Key $c 'order')) { $r.order = [int](Get-Key $c 'order') }
         $r.displayName = Get-Key $c 'displayName'
         $tested = Get-Key $c 'testedClaudeVersions'

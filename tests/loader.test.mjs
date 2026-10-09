@@ -187,7 +187,8 @@ for (const impl of impls) {
       writeExt(impl.slot(t.sb), { manifest_version: 3, name: 'Old Standalone', version: '0.3.0' }, { 'claude-keys.owner.json': '{}' });
       const cfgDir = join(t.src, 'pkg');
       cpExt(extB(t.src), join(cfgDir, 'extension'));
-      writeFileSync(join(cfgDir, 'desktop-webext.json'), JSON.stringify({ id: 'claude-ctrl-enter', displayName: 'Ctrl+Enter', source: 'extension', order: 50, adopt: { markers: ['claude-keys.owner.json'], manifestNames: [] } }));
+      // An absolute "source" must work as well as a relative one.
+      writeFileSync(join(cfgDir, 'desktop-webext.json'), JSON.stringify({ id: 'claude-ctrl-enter', displayName: 'Ctrl+Enter', source: join(cfgDir, 'extension'), order: 50, adopt: { markers: ['claude-keys.owner.json'], manifestNames: [] } }));
       impl.setForeignEnv(t.sb, '1');
       ok(impl.run(t.sb, { action: 'install', config: join(cfgDir, 'desktop-webext.json'), adoptEnv: true }));
       assert.equal(manifestOf(impl, t.sb).name, 'Claude Desktop WebExt');
