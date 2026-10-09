@@ -23,8 +23,9 @@
 
 ## STATUS
 - ps1: 15/15 tests pass locally (Windows PowerShell 5.1.26100). V
-- py: NOT run locally (no python on dev VM). CI pending.
-- not yet used against real Claude.
+- py: CI green on ubuntu + windows (cross byte-compare with ps1 on windows). not run locally (no python on dev VM).
+- REAL [U]: Windows Claude 2.31226 ENV-VM: ctrl-enter (adopted) + split-ui via loader e39289f -> both work after restart.
+- consumers released: claude-split-ui v0.2.0 (desktop zip via tools/package.mjs), claude_ctrl-enter v0.4.0 (own wrappers + bundled loader).
 
 ## NEXT
 1. push + CI green (py on ubuntu and windows, cross-compare on windows).
@@ -33,4 +34,5 @@
 4. later: backup pruning; localized messages (ja); per-ext enable/disable.
 
 ## LOG (newest first)
+- 2026-10-09 | claude-opus-5-5 | fixes found by consumers: 8.3 short-path copy (d412421), absolute config source (e39289f), webext.sh real python3 check (b46a222; Windows Store alias). made PUBLIC (user). consumers released.
 - 2026-10-09 | claude-opus-5-5 | created repo locally: ps1+py loaders, package tool, tests (ps1 15/15 V), SPEC, README, CI.
