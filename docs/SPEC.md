@@ -47,7 +47,7 @@ Custom user-data paths are not inferred. Linux retains its XDG user-data rules.
 Slot marker `<slot>/.claude-desktop-webext.json`:
 
 ```json
-{ "schema": 1, "tool": "claude-desktop-webext", "loaderVersion": "0.1.0", "generation": 3, "generatedAt": "...",
+{ "schema": 1, "tool": "claude-desktop-webext", "loaderVersion": "0.2.0", "generation": 3, "generatedAt": "...",
   "extensions": [ { "id": "...", "version": "...", "order": 10 } ], "skipped": [ { "id": "...", "reason": "..." } ] }
 ```
 

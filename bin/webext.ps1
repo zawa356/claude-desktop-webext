@@ -37,7 +37,7 @@ if ($PSVersionTable.PSVersion.Major -le 5) {
 }
 
 # ---- Fixed values (changing them breaks existing installs; see docs/SPEC.md) ----
-$LoaderVersion  = '0.1.0'
+$LoaderVersion  = '0.2.0'
 $Schema         = 1
 $SlotId         = 'fmkadmapgofadopljbjfkapdkoienihi'
 $SlotMarker     = '.claude-desktop-webext.json'

@@ -20,7 +20,7 @@ import re
 import shutil
 import sys
 
-LOADER_VERSION = "0.1.0"
+LOADER_VERSION = "0.2.0"
 SCHEMA = 1
 SLOT_ID = "fmkadmapgofadopljbjfkapdkoienihi"
 SLOT_MARKER = ".claude-desktop-webext.json"

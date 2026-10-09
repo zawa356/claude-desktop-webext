@@ -33,7 +33,8 @@ This loader keeps every tool's extension as a normal folder of its own and **gen
 
 | Platform | Status |
 |---|---|
-| Windows — Claude Desktop 2.31226 (Microsoft Store) | **Manually verified.** [claude-split-ui](https://github.com/zawa356/claude-split-ui) 0.2.x and [claude_ctrl-enter](https://github.com/zawa356/claude_ctrl-enter) 0.4.0 installed side by side: both work after a restart. Migration of a pre-existing standalone claude_ctrl-enter 0.3.0 install kept its saved settings. |
+| Windows — Claude Desktop 2.31226 (Microsoft Store) | **Manually verified.** [claude-split-ui](https://github.com/zawa356/claude-split-ui) 0.2.x and [claude_ctrl-enter](https://github.com/zawa356/claude_ctrl-enter) 0.4.0 installed side by side: both work after a restart. Migration of a pre-existing standalone claude_ctrl-enter 0.3.0 install kept its saved settings (loader 0.1.0). With 0.2.0, `diagnose` succeeds on a machine that has only MSIX virtualized user data; install there is not yet verified on a real machine. |
+| Windows — classic installer (non-MSIX) | **Untested on a real machine.** Detected through registry entries and standard locations (0.2.0); whether its build loads the extension is unknown. |
 | Linux — Claude Desktop beta | **Untested on a real machine.** `webext.py` is covered by CI only. |
 | macOS | Not supported |
 
@@ -84,7 +85,7 @@ Custom `--user-data-dir` profiles are not automatically inferred or relocated.
 
    ```sh
    git submodule add https://github.com/zawa356/claude-desktop-webext vendor/claude-desktop-webext
-   git -C vendor/claude-desktop-webext checkout v0.1.0   # pin a released version
+   git -C vendor/claude-desktop-webext checkout v0.2.0   # pin a released version
    ```
 
    Anyone cloning your repository then needs `git clone --recurse-submodules` (or `git submodule update --init`).

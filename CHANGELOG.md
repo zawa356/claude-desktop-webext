@@ -4,6 +4,10 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-09
+
+Installs on Windows machines where Claude's normal user-data folder does not exist yet, and finds Claude wherever it is installed.
+
 ### Fixed
 
 - Accept an existing MSIX virtual user-data directory when the normal roaming directory
@@ -16,6 +20,10 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
   registry entries and standard locations; show candidates and reject ambiguous selection.
 - Explicit `-ClaudePath` / `--claude-path` selection for nonstandard installations.
   Linux now rejects multiple detected installations instead of silently choosing the first.
+
+### Verified
+
+- Windows, Claude Desktop 2.31226 (MSIX) with only the virtualized user-data folder: `diagnose` now succeeds where 0.1.0 reported "start Claude once first". Installing and restarting with this version, classic (non-MSIX) Windows installations and Linux have not been tested on a real machine yet.
 
 ## [0.1.0] - 2026-10-09
 
