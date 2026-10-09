@@ -18,7 +18,9 @@ Both implementations — `bin/webext.ps1` (Windows) and `bin/webext.py` (Linux; 
 
 Windows uses MSIX registrations, running executable paths, classic uninstall registry
 InstallLocation/DisplayIcon and standard locations. Registry commands are never executed.
-Candidates are deduplicated by executable path (case insensitive). Select the sole
+A `claude.exe` is a candidate only if `resources\app.asar` exists next to it; this excludes
+other programs with the same name, such as the Claude Code CLI. The running-process count
+uses the same test. Candidates are deduplicated by executable path (case insensitive). Select the sole
 running candidate, otherwise the sole candidate; multiple candidates block changes.
 `-ClaudePath` selects an executable or installation directory explicitly. An invalid
 explicit path blocks changes. No detected candidate gives a warning for backward

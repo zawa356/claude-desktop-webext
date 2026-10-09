@@ -59,7 +59,8 @@ Requirements: Windows 10/11 with Windows PowerShell 5.1 (built in), or Linux wit
 
 Windows discovers Claude through MSIX registration, running `claude.exe` processes,
 classic installer registry entries, and standard installation directories (including
-versioned `app-*` directories). A single running candidate takes precedence. If several
+versioned `app-*` directories). Only a `claude.exe` with `resources\app.asar` next to it
+counts, so the Claude Code CLI (also `claude.exe`) is ignored. A single running candidate takes precedence. If several
 candidates remain, specify the intended executable with `-ClaudePath`:
 
 ```powershell

@@ -151,6 +151,12 @@ function Get-VirtualUserData($Package) {
     if (!$Package -or !$Package.PackageFamilyName) { return $null }
     Join-Path $Local "Packages\$($Package.PackageFamilyName)\LocalCache\Roaming\Claude"
 }
+# Claude Desktop is an Electron app: resources\app.asar sits next to claude.exe. Other programs
+# named claude.exe (e.g. the Claude Code CLI) have none and are not installations.
+function Test-ClaudeDesktopExe([string]$Exe) {
+    if (!$Exe) { return $false }
+    Test-Path -LiteralPath (Join-Path (Split-Path -Parent $Exe) 'resources\app.asar') -PathType Leaf
+}
 function Find-ClaudeExecutables([string]$Path) {
     if (!$Path) { return }
     $Path = [Environment]::ExpandEnvironmentVariables($Path.Trim('"'))
@@ -173,6 +179,7 @@ function Get-ClaudeInstallations($Packages) {
     $found = New-Object System.Collections.ArrayList
     $add = { param($Path, $Kind, $Version, $Running)
         foreach ($exe in Find-ClaudeExecutables $Path) {
+            if (!(Test-ClaudeDesktopExe $exe)) { continue }
             $existing = @($found | Where-Object { $_.Path -ieq $exe })
             if ($existing.Count) { if ($Running) { $existing[0].Running = $true }; continue }
             $v = $Version
@@ -390,7 +397,7 @@ function Get-Findings($Request, [string]$Mode) {
     if ($runningInstalls.Count -eq 1) { $selected = $runningInstalls[0] }
     elseif ($installs.Count -eq 1) { $selected = $installs[0] }
     elseif ($installs.Count -gt 1) { & $add 'NG' 'Claude' 'Multiple installations found. Specify -ClaudePath with the intended claude.exe path.' }
-    elseif ($ClaudePath) { & $add 'NG' 'Claude' '-ClaudePath does not identify a claude.exe file. Nothing will be changed.' }
+    elseif ($ClaudePath) { & $add 'NG' 'Claude' '-ClaudePath does not identify a Claude Desktop claude.exe (with resources\app.asar next to it). Nothing will be changed.' }
     else { & $add 'WARN' 'Claude' 'No executable found in package, process, registry or standard locations. Use -ClaudePath to specify it; runtime compatibility is unverified.' }
     if ($selected) {
         if ($Request -and @($Request.tested).Count -gt 0 -and ($Request.tested -notcontains $selected.Version)) {
@@ -447,7 +454,8 @@ function Get-Findings($Request, [string]$Mode) {
     foreach ($s in $plan.skipped) { & $add 'WARN' "Extension $($s.id)" "skipped: $($s.reason)" }
 
     if (!$Sandbox) {
-        $running = @(Get-Process -Name 'claude' -ErrorAction SilentlyContinue).Count
+        # A process whose path cannot be read is counted: better a needless restart hint than none.
+        $running = @(Get-Process -Name 'claude' -ErrorAction SilentlyContinue | Where-Object { !$_.Path -or (Test-ClaudeDesktopExe $_.Path) }).Count
         & $add 'INFO' 'Claude process' $(if ($running) { "running ($running). Quit Claude completely and start it again afterwards." } else { 'not running' })
     }
     , $list.ToArray()

@@ -392,7 +392,8 @@ if (hasPowerShell) {
     try {
       const source = extA(t.src);
       const paths = ['classic a', 'classic b'].map(name => {
-        const dir = join(t.sb, name); mkdirSync(dir);
+        const dir = join(t.sb, name); mkdirSync(join(dir, 'resources'), { recursive: true });
+        writeFileSync(join(dir, 'resources', 'app.asar'), 'fixture');
         const exe = join(dir, 'claude.exe'); writeFileSync(exe, 'fixture'); return exe;
       });
       const fixture = join(t.sb, 'claude-installations.json');
@@ -411,6 +412,25 @@ if (hasPowerShell) {
       entries[1].Running = true;
       writeFileSync(fixture, JSON.stringify(entries));
       refused(impl.run(t.sb, { action: 'diagnose' }));
+    } finally { t.cleanup(); }
+  });
+  test('ps1: a running claude.exe without app.asar (Claude Code CLI) is not an installation', () => {
+    const t = setup(impl);
+    try {
+      const desktop = join(t.sb, 'desktop');
+      mkdirSync(join(desktop, 'resources'), { recursive: true });
+      writeFileSync(join(desktop, 'resources', 'app.asar'), 'fixture');
+      writeFileSync(join(desktop, 'claude.exe'), 'fixture');
+      const cli = join(t.sb, 'cli', 'native-binary');
+      mkdirSync(cli, { recursive: true });
+      writeFileSync(join(cli, 'claude.exe'), 'fixture');
+      writeFileSync(join(t.sb, 'claude-installations.json'), JSON.stringify([
+        { Path: join(desktop, 'claude.exe'), Kind: 'classic registry', Version: '2.0', Running: true },
+        { Path: join(cli, 'claude.exe'), Kind: 'running executable', Version: '2.1', Running: true }]));
+      const r = impl.run(t.sb, { action: 'diagnose' }); ok(r);
+      assert.doesNotMatch(r.stdout, /native-binary/);
+      ok(impl.run(t.sb, { action: 'install', id: 'ext-a', source: extA(t.src) }));
+      refused(impl.run(t.sb, { action: 'diagnose', claudePath: join(cli, 'claude.exe') }));
     } finally { t.cleanup(); }
   });
 }
